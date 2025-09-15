@@ -22,9 +22,10 @@ def log_to_csv(user_id, username, motion, api_name, api_answer):
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
+    user_states.pop(chat_id, None)
     show_main_menu(chat_id)
 
-# Главное меню без кнопки "Меню"
+# Главное меню
 def show_main_menu(chat_id):
     keyboard_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard_markup.add(types.KeyboardButton("уники"))
@@ -32,34 +33,20 @@ def show_main_menu(chat_id):
     keyboard_markup.add(types.KeyboardButton("предсказание"))
     bot.send_message(chat_id, "Добро пожаловать! Выбери действие:", reply_markup=keyboard_markup)
 
-# Обработка медиафайлов
-@bot.message_handler(content_types=['document'])
-def addfile(message):
-    try:
-        file_info = bot.get_file(message.document.file_id)
-        downloaded_file = bot.download_file(file_info.file_path)
-        file_name = message.document.file_name
-        with open(f'D:\\практос\\{file_name}', 'wb') as new_file:
-            new_file.write(downloaded_file)
-        bot.send_message(message.chat.id, f"Файл {file_name} успешно сохранён.")
-    except Exception as e:
-        bot.send_message(message.chat.id, f"Ошибка при сохранении файла: {e}")
-
 # Обработка всех сообщений
 @bot.message_handler(func=lambda message: True)
 def echo_all(message):
     chat_id = message.chat.id
     text = message.text.strip()
     username = message.from_user.username or "—"
+    response = f'Вы написали "{text}", я не знаю такой команды.'
 
     if text == "Отмена":
         user_states.pop(chat_id, None)
         show_main_menu(chat_id)
         return
 
-    if user_states.get(chat_id) in ['awaiting_country', 'awaiting_name'] and text in ["уники", "коты", "предсказание", "Отмена"]:
-        user_states.pop(chat_id, None)
-
+    # Обработка ожидаемого ввода
     if user_states.get(chat_id) == 'awaiting_country':
         handle_country_input(message)
         return
@@ -68,6 +55,12 @@ def echo_all(message):
         handle_name_input(message)
         return
 
+    # Блокировка других команд при активном состоянии
+    if user_states.get(chat_id) in ['awaiting_country', 'awaiting_name']:
+        bot.send_message(chat_id, "Пожалуйста, завершите текущий ввод или нажмите 'Отмена'.")
+        return
+
+    # Кнопка "уники"
     if text == "уники":
         bot.send_sticker(chat_id, "CAACAgIAAxkBAAEPVzZowVnFsoyIk_hp2LNo_zuTQGZhlgACTwADlb9JMgErK2skxYHhNgQ")
         user_states[chat_id] = 'awaiting_country'
@@ -76,6 +69,7 @@ def echo_all(message):
         bot.send_message(chat_id, "Введите страну (например, Belarus):", reply_markup=cancel_markup)
         return
 
+    # Кнопка "коты"
     elif text == "коты":
         bot.send_sticker(chat_id, "CAACAgIAAxkBAAEPVzVowVnF7O-7yOLJFZbDDSQeyWS7iQACR1QAAjvgmUkWLyWxzYb-XDYE")
         try:
@@ -84,11 +78,13 @@ def echo_all(message):
             fact = r.json().get("fact")
             bot.send_message(chat_id, f"Интересный факт о кошках:\n{fact}")
             log_to_csv(chat_id, username, text, "Cat Facts", fact)
+            user_states[chat_id] = 'cat_fact_mode'
         except Exception as e:
             bot.send_message(chat_id, f"Ошибка при получении факта: {e}")
             log_to_csv(chat_id, username, text, "Cat Facts", f"Ошибка: {e}")
         return
 
+    # Кнопка "предсказание"
     elif text == "предсказание":
         bot.send_sticker(chat_id, "CAACAgIAAxkBAAEPVzhowVnFChAowQqjDOXpGOZmwHiZSQACRhYAAnuI-Esn4nImywnFZzYE")
         user_states[chat_id] = 'awaiting_name'
@@ -97,10 +93,16 @@ def echo_all(message):
         bot.send_message(chat_id, "Введите имя для предсказания возраста:", reply_markup=cancel_markup)
         return
 
-    else:
-        response = f'Вы написали "{text}", я не знаю такой команды.'
+    # Ввод после "коты"
+    elif user_states.get(chat_id) == 'cat_fact_mode':
         bot.send_message(chat_id, response)
-        log_to_csv(chat_id, username, text, "NONE", "NONE")
+        log_to_csv(chat_id, username, text, "—", response)
+        return
+
+    # Неизвестная команда
+    else:
+        bot.send_message(chat_id, response)
+        log_to_csv(chat_id, username, text, "—", response)
 
 # Университеты
 def handle_country_input(message):
@@ -157,5 +159,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-@Kr0l_bot
