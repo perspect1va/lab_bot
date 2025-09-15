@@ -22,13 +22,12 @@ def log_to_csv(user_id, username, motion, api_name, api_answer):
 def send_welcome(message):
     chat_id = message.chat.id
     show_main_menu(chat_id)
-# Главное меню
+# Главное меню без кнопки "Меню"
 def show_main_menu(chat_id):
     keyboard_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard_markup.add(types.KeyboardButton("уники"))
     keyboard_markup.add(types.KeyboardButton("коты"))
     keyboard_markup.add(types.KeyboardButton("предсказание"))
-    keyboard_markup.add(types.KeyboardButton("Меню"))
     bot.send_message(chat_id, "Добро пожаловать! Выбери действие:", reply_markup=keyboard_markup)
 # Обработка медиафайлов
 @bot.message_handler(content_types=['document'])
@@ -47,12 +46,12 @@ def addfile(message):
 def echo_all(message):
     chat_id = message.chat.id
     text = message.text.strip()
-    username = message.from_user.username
+    username = message.from_user.username or "—"
     if text == "Отмена":
         user_states.pop(chat_id, None)
         show_main_menu(chat_id)
         return
-    if user_states.get(chat_id) in ['awaiting_country', 'awaiting_name'] and text in ["уники", "коты", "предсказание", "Меню", "Назад"]:
+    if user_states.get(chat_id) in ['awaiting_country', 'awaiting_name'] and text in ["уники", "коты", "предсказание", "Отмена"]:
         user_states.pop(chat_id, None)
     if user_states.get(chat_id) == 'awaiting_country':
         handle_country_input(message)
@@ -63,7 +62,9 @@ def echo_all(message):
     if text == "уники":
         bot.send_sticker(chat_id, "CAACAgIAAxkBAAEPVzZowVnFsoyIk_hp2LNo_zuTQGZhlgACTwADlb9JMgErK2skxYHhNgQ")
         user_states[chat_id] = 'awaiting_country'
-        bot.send_message(chat_id, "Введите страну (например, Belarus):", reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(types.KeyboardButton("Отмена")))
+        cancel_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        cancel_markup.add(types.KeyboardButton("Отмена"))
+        bot.send_message(chat_id, "Введите страну (например, Belarus):", reply_markup=cancel_markup)
         return
     elif text == "коты":
         bot.send_sticker(chat_id, "CAACAgIAAxkBAAEPVzVowVnF7O-7yOLJFZbDDSQeyWS7iQACR1QAAjvgmUkWLyWxzYb-XDYE")
@@ -80,15 +81,9 @@ def echo_all(message):
     elif text == "предсказание":
         bot.send_sticker(chat_id, "CAACAgIAAxkBAAEPVzhowVnFChAowQqjDOXpGOZmwHiZSQACRhYAAnuI-Esn4nImywnFZzYE")
         user_states[chat_id] = 'awaiting_name'
-        bot.send_message(chat_id, "Введите имя для предсказания возраста:", reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(types.KeyboardButton("Отмена")))
-        return
-    elif text == "Меню":
-        sub_menu = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        sub_menu.add(types.KeyboardButton("Назад"))
-        bot.send_message(chat_id, "Выберите пункт меню:", reply_markup=sub_menu)
-        return
-    elif text == "Назад":
-        show_main_menu(chat_id)
+        cancel_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        cancel_markup.add(types.KeyboardButton("Отмена"))
+        bot.send_message(chat_id, "Введите имя для предсказания возраста:", reply_markup=cancel_markup)
         return
     else:
         response = f'Вы написали "{text}", я не знаю такой команды.'
@@ -137,6 +132,7 @@ def handle_name_input(message):
         bot.send_message(chat_id, f"Произошла ошибка: {e}")
         log_to_csv(chat_id, username, "Keyboard typing", "Agify.io", f"Ошибка: {e}")
     user_states.pop(chat_id, None)
+
 # Запуск
 def main():
     try:
