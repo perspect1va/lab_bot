@@ -17,11 +17,13 @@ def log_to_csv(user_id, username, motion, api_name, api_answer):
     with open("bot_log.csv", mode="a", encoding="utf-8", newline='') as file:
         writer = csv.writer(file)
         writer.writerow([user_id, f"@{username}", motion, api_name, date, time, api_answer])
+
 # Старт
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
     show_main_menu(chat_id)
+
 # Главное меню без кнопки "Меню"
 def show_main_menu(chat_id):
     keyboard_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -29,6 +31,7 @@ def show_main_menu(chat_id):
     keyboard_markup.add(types.KeyboardButton("коты"))
     keyboard_markup.add(types.KeyboardButton("предсказание"))
     bot.send_message(chat_id, "Добро пожаловать! Выбери действие:", reply_markup=keyboard_markup)
+
 # Обработка медиафайлов
 @bot.message_handler(content_types=['document'])
 def addfile(message):
@@ -41,24 +44,30 @@ def addfile(message):
         bot.send_message(message.chat.id, f"Файл {file_name} успешно сохранён.")
     except Exception as e:
         bot.send_message(message.chat.id, f"Ошибка при сохранении файла: {e}")
+
 # Обработка всех сообщений
 @bot.message_handler(func=lambda message: True)
 def echo_all(message):
     chat_id = message.chat.id
     text = message.text.strip()
     username = message.from_user.username or "—"
+
     if text == "Отмена":
         user_states.pop(chat_id, None)
         show_main_menu(chat_id)
         return
+
     if user_states.get(chat_id) in ['awaiting_country', 'awaiting_name'] and text in ["уники", "коты", "предсказание", "Отмена"]:
         user_states.pop(chat_id, None)
+
     if user_states.get(chat_id) == 'awaiting_country':
         handle_country_input(message)
         return
+
     if user_states.get(chat_id) == 'awaiting_name':
         handle_name_input(message)
         return
+
     if text == "уники":
         bot.send_sticker(chat_id, "CAACAgIAAxkBAAEPVzZowVnFsoyIk_hp2LNo_zuTQGZhlgACTwADlb9JMgErK2skxYHhNgQ")
         user_states[chat_id] = 'awaiting_country'
@@ -66,6 +75,7 @@ def echo_all(message):
         cancel_markup.add(types.KeyboardButton("Отмена"))
         bot.send_message(chat_id, "Введите страну (например, Belarus):", reply_markup=cancel_markup)
         return
+
     elif text == "коты":
         bot.send_sticker(chat_id, "CAACAgIAAxkBAAEPVzVowVnF7O-7yOLJFZbDDSQeyWS7iQACR1QAAjvgmUkWLyWxzYb-XDYE")
         try:
@@ -73,11 +83,12 @@ def echo_all(message):
             r.raise_for_status()
             fact = r.json().get("fact")
             bot.send_message(chat_id, f"Интересный факт о кошках:\n{fact}")
-            log_to_csv(chat_id, username, "Button press", "Cat Facts", fact)
+            log_to_csv(chat_id, username, text, "Cat Facts", fact)
         except Exception as e:
             bot.send_message(chat_id, f"Ошибка при получении факта: {e}")
-            log_to_csv(chat_id, username, "Button press", "Cat Facts", f"Ошибка: {e}")
+            log_to_csv(chat_id, username, text, "Cat Facts", f"Ошибка: {e}")
         return
+
     elif text == "предсказание":
         bot.send_sticker(chat_id, "CAACAgIAAxkBAAEPVzhowVnFChAowQqjDOXpGOZmwHiZSQACRhYAAnuI-Esn4nImywnFZzYE")
         user_states[chat_id] = 'awaiting_name'
@@ -85,10 +96,12 @@ def echo_all(message):
         cancel_markup.add(types.KeyboardButton("Отмена"))
         bot.send_message(chat_id, "Введите имя для предсказания возраста:", reply_markup=cancel_markup)
         return
+
     else:
         response = f'Вы написали "{text}", я не знаю такой команды.'
         bot.send_message(chat_id, response)
-        log_to_csv(chat_id, username, "Keyboard typing", "NONE", "NONE")
+        log_to_csv(chat_id, username, text, "NONE", "NONE")
+
 # Университеты
 def handle_country_input(message):
     chat_id = message.chat.id
@@ -102,14 +115,15 @@ def handle_country_input(message):
         if data:
             reply = f"Университеты в {country}:\n\n" + "\n".join(f"- {uni['name']}" for uni in data[:30])
             bot.send_message(chat_id, reply)
-            log_to_csv(chat_id, username, "Keyboard typing", "UniverOfCountry", f"{len(data)} университетов")
+            log_to_csv(chat_id, username, country, "UniverOfCountry", f"{len(data)} университетов")
         else:
             bot.send_message(chat_id, f"Университеты в {country} не найдены.")
-            log_to_csv(chat_id, username, "Keyboard typing", "UniverOfCountry", "0 университетов")
+            log_to_csv(chat_id, username, country, "UniverOfCountry", "0 университетов")
     except Exception as e:
         bot.send_message(chat_id, f"Ошибка при запросе: {e}")
-        log_to_csv(chat_id, username, "Keyboard typing", "UniverOfCountry", f"Ошибка: {e}")
+        log_to_csv(chat_id, username, country, "UniverOfCountry", f"Ошибка: {e}")
     user_states.pop(chat_id, None)
+
 # Предсказание возраста
 def handle_name_input(message):
     chat_id = message.chat.id
@@ -127,10 +141,10 @@ def handle_name_input(message):
         else:
             reply = f"Не удалось получить возраст для имени {name}."
         bot.send_message(chat_id, reply)
-        log_to_csv(chat_id, username, "Keyboard typing", "Agify.io", reply)
+        log_to_csv(chat_id, username, name, "Agify.io", reply)
     except Exception as e:
         bot.send_message(chat_id, f"Произошла ошибка: {e}")
-        log_to_csv(chat_id, username, "Keyboard typing", "Agify.io", f"Ошибка: {e}")
+        log_to_csv(chat_id, username, name, "Agify.io", f"Ошибка: {e}")
     user_states.pop(chat_id, None)
 
 # Запуск
@@ -143,3 +157,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+@Kr0l_bot
